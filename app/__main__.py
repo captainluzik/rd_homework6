@@ -13,17 +13,15 @@ async def process_files(file_paths: list, semaphore: asyncio.Semaphore) -> None:
         tasks = [u.read_file(file_path) for file_path in file_paths]
         results = await asyncio.gather(*tasks)
 
-        cve_records, problem_types, references, metrics, affected_products, product_versions = [], [], [], [], [], []
+        cve_records, problem_types, references = [], [], []
 
         for result in results:
             cve_record = await process_cve_record(result)
             cve_records.append(cve_record)
             problem_types.extend(await process_problem_types(result, cve_record))
-            references.extend(await process_references(result))
-            affected_products.extend(await process_affected_products(result, cve_record))
-            product_versions.extend(await process_product_versions(result))
+            references.extend(await process_references(result, cve_record))
 
-        await save_to_database(cve_records, problem_types, references, affected_products, product_versions)
+        await save_to_database(cve_records, problem_types, references)
 
 
 async def process_cve_record(result: dict) -> m.CVERecord:
@@ -39,43 +37,20 @@ async def process_problem_types(result: dict, cve_record: m.CVERecord) -> list:
     return problem_types
 
 
-async def process_references(result: dict) -> list:
+async def process_references(result: dict, cve_record: m.CVERecord) -> list:
     references = []
     for reference_data in result.get("containers", {}).get("cna", {}).get("references", []):
-        reference = await u.create_reference(reference_data)
+        reference = await u.create_reference(reference_data, cve_record)
         references.append(reference)
     return references
 
 
-async def process_affected_products(result: dict, cve_record: m.CVERecord) -> list:
-    affected_products = []
-    affected_products_data = result.get("containers", {}).get("cna", {}).get("affectedProducts", [])
-    for affected_product_data in affected_products_data:
-        affected_product = await u.create_affected_product(affected_product_data, cve_record)
-        affected_products.append(affected_product)
-    return affected_products
-
-
-async def process_product_versions(result: dict) -> list:
-    product_versions = []
-    affected_products_data = result.get("containers", {}).get("cna", {}).get("affectedProducts", [])
-    for affected_product_data in affected_products_data:
-        product_versions_data = affected_product_data.get("productVersions", [])
-        for product_version_data in product_versions_data:
-            product_version = await u.create_product_version(product_version_data, affected_product_data)
-            product_versions.append(product_version)
-    return product_versions
-
-
-async def save_to_database(cve_records, problem_types, references, affected_products,
-                           product_versions) -> None:
+async def save_to_database(cve_records, problem_types, references) -> None:
     async with async_session(engine()) as session:
         async with session.begin():
             session.add_all(cve_records)
             session.add_all(problem_types)
             session.add_all(references)
-            session.add_all(affected_products)
-            session.add_all(product_versions)
 
 
 async def main(path: str) -> None:

@@ -32,13 +32,5 @@ async def create_problem_type(data: dict, cve_record: m.CVERecord) -> m.ProblemT
     return m.ProblemType.from_dict(data, cve_record)
 
 
-async def create_reference(data: dict) -> m.Reference:
-    return m.Reference.from_dict(data)
-
-
-async def create_affected_product(data: dict, cve_record: m.CVERecord) -> m.AffectedProduct:
-    return m.AffectedProduct.from_dict(data, cve_record)
-
-
-async def create_product_version(data: dict, affected_product: m.AffectedProduct) -> m.ProductVersion:
-    return m.ProductVersion.from_dict(data, affected_product)
+async def create_reference(data: dict, cve_record: m.CVERecord) -> m.Reference:
+    return m.Reference.from_dict(data, cve_record)
